@@ -1,3 +1,4 @@
 [submodule "server/src/cosmic"]
 	path = server/src/cosmic
 	url = https://github.com/FrederoxDev/Cosmic.git
+	branch = RewriteV3
