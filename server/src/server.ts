@@ -145,64 +145,67 @@ async function validateTextDocument(textDocument: TextDocument): Promise<void> {
 	const text = textDocument.getText();
 	const diagnostics: Diagnostic[] = [];
 
-	var [tokens, tokenError] = Tokenize(text);
+	try {
+		var [tokens, tokenError] = Tokenize(text);
 
-	if (tokenError) {
-		tokenError = tokenError as LexerError
-		const diagnostic: Diagnostic = {
-			severity: DiagnosticSeverity.Warning,
-			range: {
-				start: textDocument.positionAt(tokenError.startIdx),
-				end: textDocument.positionAt(tokenError.endIdx)
-			},
-			message: "Lexer",
-			source: 'ex'
-		};
-		diagnostics.push(diagnostic);
+		if (tokenError) {
+			tokenError = tokenError as LexerError
+			const diagnostic: Diagnostic = {
+				severity: DiagnosticSeverity.Warning,
+				range: {
+					start: textDocument.positionAt(tokenError.startIdx),
+					end: textDocument.positionAt(tokenError.endIdx)
+				},
+				message: "Lexer",
+				source: 'ex'
+			};
+			diagnostics.push(diagnostic);
 
-		if (hasDiagnosticRelatedInformationCapability) {
-			diagnostic.relatedInformation = [
-				{
-					location: {
-						uri: textDocument.uri,
-						range: Object.assign({}, diagnostic.range)
-					},
-					message: tokenError.message
-				}
-			];
+			if (hasDiagnosticRelatedInformationCapability) {
+				diagnostic.relatedInformation = [
+					{
+						location: {
+							uri: textDocument.uri,
+							range: Object.assign({}, diagnostic.range)
+						},
+						message: tokenError.message
+					}
+				];
+			}
+
+			connection.sendDiagnostics({ uri: textDocument.uri, diagnostics });
+			return;
 		}
 
-		connection.sendDiagnostics({ uri: textDocument.uri, diagnostics });
-		return;
-	}
+		const parser = new Parser(tokens as LexerToken[], text);
+		const [ast, parseError]: any = parser.parse();
 
-	const parser = new Parser(tokens as LexerToken[], text);
-	const [ast, parseError]: any = parser.parse();
+		if (parseError) {
+			const diagnostic: Diagnostic = {
+				severity: DiagnosticSeverity.Warning,
+				range: {
+					start: textDocument.positionAt(parser.errStart),
+					end: textDocument.positionAt(parser.errEnd)
+				},
+				message: "Parser",
+				source: 'ex'
+			};
+			diagnostics.push(diagnostic);
 
-	if (parseError) {
-		const diagnostic: Diagnostic = {
-			severity: DiagnosticSeverity.Warning,
-			range: {
-				start: textDocument.positionAt(parser.errStart),
-				end: textDocument.positionAt(parser.errEnd)
-			},
-			message: "Parse Error",
-			source: 'ex'
-		};
-		diagnostics.push(diagnostic);
-
-		if (hasDiagnosticRelatedInformationCapability) {
-			diagnostic.relatedInformation = [
-				{
-					location: {
-						uri: textDocument.uri,
-						range: Object.assign({}, diagnostic.range)
-					},
-					message: parser.errMessage
-				}
-			];
+			if (hasDiagnosticRelatedInformationCapability) {
+				diagnostic.relatedInformation = [
+					{
+						location: {
+							uri: textDocument.uri,
+							range: Object.assign({}, diagnostic.range)
+						},
+						message: parser.errMessage
+					}
+				];
+			}
 		}
 	}
+	catch { }
 
 	connection.sendDiagnostics({ uri: textDocument.uri, diagnostics });
 }
@@ -213,40 +216,22 @@ connection.onDidChangeWatchedFiles(_change => {
 });
 
 // This handler provides the initial list of the completion items.
-// connection.onCompletion(
-// 	(_textDocumentPosition: TextDocumentPositionParams): CompletionItem[] => {
-// 		// The pass parameter contains the position of the text document in
-// 		// which code complete got requested. For the example we ignore this
-// 		// info and always provide the same completion items.
-// 		return [
-// 			{
-// 				label: 'TypeScript',
-// 				kind: CompletionItemKind.Text,
-// 				data: 1
-// 			},
-// 			{
-// 				label: 'JavaScript',
-// 				kind: CompletionItemKind.Text,
-// 				data: 2
-// 			}
-// 		];
-// 	}
-// );
+connection.onCompletion(
+	(_textDocumentPosition: TextDocumentPositionParams): CompletionItem[] => {
+		// The pass parameter contains the position of the text document in
+		// which code complete got requested. For the example we ignore this
+		// info and always provide the same completion items.
+		return [];
+	}
+);
 
 // This handler resolves additional information for the item selected in
 // the completion list.
-// connection.onCompletionResolve(
-// 	(item: CompletionItem): CompletionItem => {
-// 		if (item.data === 1) {
-// 			item.detail = 'TypeScript details';
-// 			item.documentation = 'TypeScript documentation';
-// 		} else if (item.data === 2) {
-// 			item.detail = 'JavaScript details';
-// 			item.documentation = 'JavaScript documentation';
-// 		}
-// 		return item;
-// 	}
-// );
+connection.onCompletionResolve(
+	(item: CompletionItem): CompletionItem => {
+		return item
+	}
+);
 
 // Make the text document manager listen on the connection
 // for open, change and close text document events

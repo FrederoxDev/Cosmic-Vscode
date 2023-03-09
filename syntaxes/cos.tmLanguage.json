@@ -1,0 +1,32 @@
+{
+  "scopeName": "source.cos",
+  "patterns": [{ "include": "#expression" }],
+  "repository": {
+    "expression": {
+      "patterns": [{ "include": "#if" }, { "include": "#let" }, {"include": "#number"}, 
+      {"include": "#boolean"}, {"include": "#string"}
+    ]
+    },
+    "if": {
+      "name": "keyword.control.if",
+      "match": "\\b(if)\\b"
+    },
+    "let": {
+      "name": "keyword.declaration.let",
+      "match": "\\b(let)\\b"
+    },
+    "number": {
+      "name": "constant.numeric",
+      "match": "\\b[0-9]+\\b"
+    },
+    "string": {
+      "name": "string.quoted.double",
+      "begin": "\"",
+      "end": "\""
+    },
+    "boolean": {
+      "name": "constant.language.boolean",
+      "match": "\\b(true|false)\\b"
+    }
+  }
+}
