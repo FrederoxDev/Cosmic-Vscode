@@ -3,7 +3,7 @@
 	"description": "Live server for Cosmic",
 	"author": "FrederoxDev",
 	"license": "MIT",
-	"version": "1.0.0",
+	"version": "1.0.1",
 	"repository": {
 		"type": "git",
 		"url": "https://github.com/FrederoxDev/Cosmic-Vscode"
@@ -48,8 +48,12 @@
 		"languages": [
 			{
 				"id": "cosmic",
-				"aliases": ["Cosmic"],
-				"extensions": [".cos"],
+				"aliases": [
+					"Cosmic"
+				],
+				"extensions": [
+					".cos"
+				],
 				"icon": {
 					"light": "./icons/cosmic.png",
 					"dark": "./icons/cosmic.png"
