@@ -69,7 +69,7 @@
 		]
 	},
 	"scripts": {
-		"deploy": "vsce publish minor",
+		"update": "vsce publish minor",
 		"vscode:prepublish": "npm run compile",
 		"compile": "tsc -b",
 		"watch": "tsc -b -w",
