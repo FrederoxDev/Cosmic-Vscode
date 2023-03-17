@@ -1,19 +1,26 @@
 {
   "scopeName": "source.cos",
-  "patterns": [{ "include": "#expression" }],
+  "patterns": [
+    {
+      "include": "#expression"
+    }
+  ],
   "repository": {
     "expression": {
-      "patterns": [{ "include": "#if" }, { "include": "#let" }, {"include": "#number"}, 
-      {"include": "#boolean"}, {"include": "#string"}
-    ]
+      "patterns": [
+        {
+          "include": "#atom"
+        }
+      ]
     },
-    "if": {
-      "name": "keyword.control.if",
-      "match": "\\b(if)\\b"
-    },
-    "let": {
-      "name": "keyword.declaration.let",
-      "match": "\\b(let)\\b"
+    "atom": {
+      "patterns": [
+        {"include": "#string"},
+        {"include": "#boolean"},
+        {"include": "#number"},
+        {"include": "#group"},
+        {"include": "#index"}
+      ]
     },
     "number": {
       "name": "constant.numeric",
@@ -27,6 +34,30 @@
     "boolean": {
       "name": "constant.language.boolean",
       "match": "\\b(true|false)\\b"
+    },
+    "group": {
+      "begin": "\\(",
+      "end": "\\)",
+      "beginCaptures": {
+        "0": { "name": "punctuation.paren.open" }
+      },
+      "endCaptures": {
+        "0": { "name": "punctuation.paren.close" }
+      },
+      "name": "expression.group",
+      "patterns": [{ "include": "#expression" }]
+    },
+    "index": {
+      "begin": "\\[",
+      "end": "\\]",
+      "beginCaptures": {
+        "0": { "name": "punctuation.brackets.square" }
+      },
+      "endCaptures": {
+        "0": { "name": "punctuation.brackets.square" }
+      },
+      "name": "expression.group",
+      "patterns": [{ "include": "#expression" }]
     }
   }
 }

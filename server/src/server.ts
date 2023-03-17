@@ -21,8 +21,10 @@ import {
 	TextDocument
 } from 'vscode-languageserver-textdocument';
 
-import { LexerError, LexerToken, Tokenize } from './cosmic/src/Lexer';
+import { Tokenize } from './cosmic/src/Lexer';
 import { Parser } from './cosmic/src/Parser';
+
+import structs from "./data/structs.json";
 
 // Create a connection for the server, using Node's IPC as a transport.
 // Also include all preview / proposed LSP features.
@@ -146,15 +148,13 @@ async function validateTextDocument(textDocument: TextDocument): Promise<void> {
 	const diagnostics: Diagnostic[] = [];
 
 	try {
-		var [tokens, tokenError] = Tokenize(text);
-
-		if (tokenError) {
-			tokenError = tokenError as LexerError
+		var tokens = Tokenize(text);
+		if (!Array.isArray(tokens)) {
 			const diagnostic: Diagnostic = {
 				severity: DiagnosticSeverity.Warning,
 				range: {
-					start: textDocument.positionAt(tokenError.startIdx),
-					end: textDocument.positionAt(tokenError.endIdx)
+					start: textDocument.positionAt(tokens.start),
+					end: textDocument.positionAt(tokens.end)
 				},
 				message: "Lexer",
 				source: 'ex'
@@ -168,7 +168,7 @@ async function validateTextDocument(textDocument: TextDocument): Promise<void> {
 							uri: textDocument.uri,
 							range: Object.assign({}, diagnostic.range)
 						},
-						message: tokenError.message
+						message: tokens.message
 					}
 				];
 			}
@@ -177,7 +177,7 @@ async function validateTextDocument(textDocument: TextDocument): Promise<void> {
 			return;
 		}
 
-		const parser = new Parser(tokens as LexerToken[], text);
+		const parser = new Parser(tokens, text);
 		const [ast, parseError]: any = parser.parse();
 
 		if (parseError) {
@@ -187,8 +187,7 @@ async function validateTextDocument(textDocument: TextDocument): Promise<void> {
 					start: textDocument.positionAt(parser.errStart),
 					end: textDocument.positionAt(parser.errEnd)
 				},
-				message: "Parser",
-				source: 'ex'
+				message: "Parser"
 			};
 			diagnostics.push(diagnostic);
 
@@ -210,18 +209,28 @@ async function validateTextDocument(textDocument: TextDocument): Promise<void> {
 	connection.sendDiagnostics({ uri: textDocument.uri, diagnostics });
 }
 
-connection.onDidChangeWatchedFiles(_change => {
-	// Monitored files have change in VSCode
-	connection.console.log('We received an file change event');
-});
-
 // This handler provides the initial list of the completion items.
 connection.onCompletion(
 	(_textDocumentPosition: TextDocumentPositionParams): CompletionItem[] => {
-		// The pass parameter contains the position of the text document in
-		// which code complete got requested. For the example we ignore this
-		// info and always provide the same completion items.
-		return [];
+		const completions: CompletionItem[] = []
+
+		structs.forEach(struct => {
+			completions.push({
+				"label": struct.name,
+				"kind": CompletionItemKind.Struct
+			})
+
+			struct.staticMethods.forEach(staticMethod => {
+				connection.console.log(staticMethod.name)
+				completions.push({
+					"label": `${struct.name}::${staticMethod.name}`,
+					"kind": CompletionItemKind.Function,
+					"documentation": staticMethod.description
+				})
+			})
+		})
+		
+		return completions;
 	}
 );
 
