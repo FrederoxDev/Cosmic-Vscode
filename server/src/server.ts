@@ -22,9 +22,10 @@ import {
 } from 'vscode-languageserver-textdocument';
 
 import { Tokenize } from './cosmic/src/Lexer';
-import { Parser } from './cosmic/src/Parser';
+import { Parser, StatementCommon } from './cosmic/src/Parser';
 
 import structs from "./data/structs.json";
+import { Scope, StaticAnalysis } from './cosmic/src/StaticAnalysis';
 
 // Create a connection for the server, using Node's IPC as a transport.
 // Also include all preview / proposed LSP features.
@@ -139,22 +140,27 @@ documents.onDidChangeContent(change => {
 	validateTextDocument(change.document);
 });
 
+var doc: TextDocument | undefined = undefined;  
+var tokens = []
+var ast: StatementCommon | undefined = undefined 
+
 async function validateTextDocument(textDocument: TextDocument): Promise<void> {
 	// In this simple example we get the settings for every validate run.
 	const settings = await getDocumentSettings(textDocument.uri);
 
 	// The validator creates diagnostics for all uppercase words length 2 and more
 	const text = textDocument.getText();
+	doc = textDocument;
 	const diagnostics: Diagnostic[] = [];
 
 	try {
-		var tokens = Tokenize(text);
-		if (!Array.isArray(tokens)) {
+		var tokensRes = Tokenize(text);
+		if (!Array.isArray(tokensRes)) {
 			const diagnostic: Diagnostic = {
 				severity: DiagnosticSeverity.Warning,
 				range: {
-					start: textDocument.positionAt(tokens.start),
-					end: textDocument.positionAt(tokens.end)
+					start: textDocument.positionAt(tokensRes.start),
+					end: textDocument.positionAt(tokensRes.end)
 				},
 				message: "Lexer",
 				source: 'ex'
@@ -168,7 +174,7 @@ async function validateTextDocument(textDocument: TextDocument): Promise<void> {
 							uri: textDocument.uri,
 							range: Object.assign({}, diagnostic.range)
 						},
-						message: tokens.message
+						message: tokensRes.message
 					}
 				];
 			}
@@ -177,8 +183,8 @@ async function validateTextDocument(textDocument: TextDocument): Promise<void> {
 			return;
 		}
 
-		const parser = new Parser(tokens, text);
-		const [ast, parseError]: any = parser.parse();
+		var parser = new Parser(tokensRes, text);
+		var [astRes, parseError]: any = parser.parse();
 
 		if (parseError) {
 			const diagnostic: Diagnostic = {
@@ -203,6 +209,9 @@ async function validateTextDocument(textDocument: TextDocument): Promise<void> {
 				];
 			}
 		}
+
+		tokens = tokensRes;
+		ast = astRes;
 	}
 	catch { }
 
@@ -212,27 +221,34 @@ async function validateTextDocument(textDocument: TextDocument): Promise<void> {
 // This handler provides the initial list of the completion items.
 connection.onCompletion(
 	(_textDocumentPosition: TextDocumentPositionParams): CompletionItem[] => {
-		const completions: CompletionItem[] = []
+		const completions: CompletionItem[] = [];
 
-		structs.forEach(struct => {
-			completions.push({
-				"label": struct.name,
-				"kind": CompletionItemKind.Struct
-			})
+		// Get all the variables in the current scope
+		// So functions should not see outside and vise versa
 
-			struct.staticMethods.forEach(staticMethod => {
-				connection.console.log(staticMethod.name)
-				completions.push({
-					"label": `${struct.name}::${staticMethod.name}`,
-					"kind": CompletionItemKind.Function,
-					"documentation": staticMethod.description
-				})
-			})
-		})
+		if (doc == undefined || ast == undefined) return [];
+
+		const index = doc.offsetAt(_textDocumentPosition.position);
+		// TODO: MODIFY GETCURRENTSCOPE TO ONLY RETURN THE CURRENT SCOPE
+		const scope = new StaticAnalysis(ast).getCurrentScope(index);
+		completions.push(...getCompletionsFromScope(scope));
 		
 		return completions;
 	}
 );
+
+const getCompletionsFromScope = (scope: Scope): CompletionItem[] => {
+	var completions: CompletionItem[] = []
+
+	scope.variables.forEach(variable => {
+		completions.push({
+			label: variable.id,
+			kind: CompletionItemKind.Variable
+		})
+	})
+
+	return completions; 
+}
 
 // This handler resolves additional information for the item selected in
 // the completion list.
