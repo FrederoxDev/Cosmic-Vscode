@@ -140,9 +140,9 @@ documents.onDidChangeContent(change => {
 	validateTextDocument(change.document);
 });
 
-var doc: TextDocument | undefined = undefined;  
+var doc: TextDocument | undefined = undefined;
 var tokens = []
-var ast: StatementCommon | undefined = undefined 
+var ast: StatementCommon | undefined = undefined
 
 async function validateTextDocument(textDocument: TextDocument): Promise<void> {
 	// In this simple example we get the settings for every validate run.
@@ -228,17 +228,29 @@ connection.onCompletion(
 
 		if (doc == undefined || ast == undefined) return [];
 
-		const index = doc.offsetAt(_textDocumentPosition.position);
-		// TODO: MODIFY GETCURRENTSCOPE TO ONLY RETURN THE CURRENT SCOPE
-		const scope = new StaticAnalysis(ast).getCurrentScope(index);
-		completions.push(...getCompletionsFromScope(scope));
-		
+		try {
+			const index = doc.offsetAt(_textDocumentPosition.position);
+			const analyser = new StaticAnalysis()
+			const globalScope = analyser.traverse(ast, new Scope(ast.start, doc.getText().length))
+			const currentScope = analyser.getCurrentScope(index, globalScope);
+			completions.push(...getCompletionsFromScope(currentScope));
+		} 
+		catch (e) {
+			console.log("ERROR!!")
+			console.log(e);
+		}
+
 		return completions;
 	}
 );
 
 const getCompletionsFromScope = (scope: Scope): CompletionItem[] => {
 	var completions: CompletionItem[] = []
+
+	scope.children.forEach(child => {
+		if (child === undefined) return;
+		completions.push(...getCompletionsFromScope(child))
+	})
 
 	scope.variables.forEach(variable => {
 		completions.push({
@@ -247,7 +259,7 @@ const getCompletionsFromScope = (scope: Scope): CompletionItem[] => {
 		})
 	})
 
-	return completions; 
+	return completions;
 }
 
 // This handler resolves additional information for the item selected in

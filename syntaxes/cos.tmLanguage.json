@@ -1,9 +1,8 @@
 {
   "scopeName": "source.cos",
   "patterns": [
-    {
-      "include": "#expression"
-    }
+    {"include": "#expression"},
+    {"include": "#keywords"}
   ],
   "repository": {
     "expression": {
@@ -12,6 +11,25 @@
           "include": "#atom"
         }
       ]
+    },
+    "keywords": {
+      "patterns": [
+        {"include": "#if"},
+        {"include": "#else"},
+        {"include": "#while"}
+      ]
+    },
+    "if": {
+      "name": "keyword.control",
+      "match": "\\bif\\b"
+    },
+    "else": {
+      "name": "keyword.control",
+      "match": "\\belse\\b"
+    },
+    "while": {
+      "name": "keyword.control",
+      "match": "\\bwhile\\b"
     },
     "atom": {
       "patterns": [
