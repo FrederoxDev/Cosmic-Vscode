@@ -142,7 +142,8 @@ documents.onDidChangeContent(change => {
 
 var doc: TextDocument | undefined = undefined;
 var tokens = []
-var ast: StatementCommon | undefined = undefined
+var ast: StatementCommon | undefined = undefined;
+var didChangeLast = false;
 
 async function validateTextDocument(textDocument: TextDocument): Promise<void> {
 	// In this simple example we get the settings for every validate run.
@@ -152,6 +153,7 @@ async function validateTextDocument(textDocument: TextDocument): Promise<void> {
 	const text = textDocument.getText();
 	doc = textDocument;
 	const diagnostics: Diagnostic[] = [];
+	didChangeLast = false;
 
 	try {
 		var tokensRes = Tokenize(text);
@@ -183,7 +185,7 @@ async function validateTextDocument(textDocument: TextDocument): Promise<void> {
 			return;
 		}
 
-		var parser = new Parser(tokensRes, text);
+		var parser = new Parser(tokensRes, text, true);
 		var [astRes, parseError]: any = parser.parse();
 
 		if (parseError) {
@@ -208,10 +210,13 @@ async function validateTextDocument(textDocument: TextDocument): Promise<void> {
 					}
 				];
 			}
+
+			return;
 		}
 
 		tokens = tokensRes;
 		ast = astRes;
+		didChangeLast = true;
 	}
 	catch { }
 
@@ -226,6 +231,8 @@ connection.onCompletion(
 		// Get all the variables in the current scope
 		// So functions should not see outside and vise versa
 
+		console.log("didChangeSinceLast", didChangeLast)
+		console.log("ast", ast)
 		if (doc == undefined || ast == undefined) return [];
 
 		try {
@@ -233,8 +240,9 @@ connection.onCompletion(
 			const analyser = new StaticAnalysis()
 			const globalScope = analyser.traverse(ast, new Scope(ast.start, doc.getText().length))
 			const currentScope = analyser.getCurrentScope(index, globalScope);
-			completions.push(...getCompletionsFromScope(currentScope));
-		} 
+			if (didChangeLast)
+				completions.push(...getCompletionsFromScope(currentScope));
+		}
 		catch (e) {
 			console.log("ERROR!!")
 			console.log(e);
