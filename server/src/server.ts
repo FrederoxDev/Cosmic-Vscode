@@ -25,7 +25,7 @@ import { Tokenize } from './cosmic/src/Lexer';
 import { Parser, StatementCommon } from './cosmic/src/Parser';
 
 import structs from "./data/structs.json";
-import { Scope, StaticAnalysis } from './cosmic/src/StaticAnalysis';
+import { MemberProperty, Scope, StaticAnalysis, typeDefinitions } from './cosmic/src/StaticAnalysis';
 
 // Create a connection for the server, using Node's IPC as a transport.
 // Also include all preview / proposed LSP features.
@@ -231,8 +231,6 @@ connection.onCompletion(
 		// Get all the variables in the current scope
 		// So functions should not see outside and vise versa
 
-		console.log("didChangeSinceLast", didChangeLast)
-		console.log("ast", ast)
 		if (doc == undefined || ast == undefined) return [];
 
 		try {
@@ -240,8 +238,25 @@ connection.onCompletion(
 			const analyser = new StaticAnalysis()
 			const globalScope = analyser.traverse(ast, new Scope(ast.start, doc.getText().length))
 			const currentScope = analyser.getCurrentScope(index, globalScope);
-			if (didChangeLast)
+
+			// Show variables in scope
+			if (didChangeLast && !analyser.useMember) {
+				// Variables
 				completions.push(...getCompletionsFromScope(currentScope));
+
+				// Structs
+				typeDefinitions.forEach(type => {
+					completions.push({
+						label: type.id,
+						kind: CompletionItemKind.Struct
+					})
+				})
+			}
+
+			// Show member properties
+			else if (didChangeLast && analyser.useMember) {
+				completions.push(...getCompletionsFromMember(analyser))
+			}
 		}
 		catch (e) {
 			console.log("ERROR!!")
@@ -255,11 +270,13 @@ connection.onCompletion(
 const getCompletionsFromScope = (scope: Scope): CompletionItem[] => {
 	var completions: CompletionItem[] = []
 
+	// Completions from children scopes
 	scope.children.forEach(child => {
 		if (child === undefined) return;
 		completions.push(...getCompletionsFromScope(child))
 	})
 
+	// Completions from scope variables
 	scope.variables.forEach(variable => {
 		completions.push({
 			label: variable.id,
@@ -268,6 +285,33 @@ const getCompletionsFromScope = (scope: Scope): CompletionItem[] => {
 	})
 
 	return completions;
+}
+
+const getCompletionsFromMember = (analyser: StaticAnalysis): CompletionItem[] => {
+	var completions: CompletionItem[] = [];
+
+	analyser.memberProperties.forEach(prop => {
+		completions.push({
+			label: prop.id,
+			kind: CompletionItemKind.Property
+		})
+	})
+
+	analyser.memberMethods.forEach(prop => {
+		completions.push({
+			label: prop.id,
+			kind: CompletionItemKind.Method
+		})
+	})
+
+	analyser.memberStaticMethods.forEach(prop => {
+		completions.push({
+			label: prop.id,
+			kind: CompletionItemKind.Method
+		})
+	})
+
+	return completions
 }
 
 // This handler resolves additional information for the item selected in
