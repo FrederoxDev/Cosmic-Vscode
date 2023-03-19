@@ -14,7 +14,10 @@ import {
 	CompletionItemKind,
 	TextDocumentPositionParams,
 	TextDocumentSyncKind,
-	InitializeResult
+	InitializeResult,
+	Disposable,
+	Hover,
+	Range
 } from 'vscode-languageserver/node';
 
 import {
@@ -24,8 +27,8 @@ import {
 import { Tokenize } from './cosmic/src/Lexer';
 import { Parser, StatementCommon } from './cosmic/src/Parser';
 
-import structs from "./data/structs.json";
-import { MemberProperty, Scope, StaticAnalysis, typeDefinitions } from './cosmic/src/StaticAnalysis';
+import { Scope, StaticAnalysis } from './cosmic/src/StaticAnalysis';
+import { typeDefinitions } from './cosmic/src/Definitions';
 
 // Create a connection for the server, using Node's IPC as a transport.
 // Also include all preview / proposed LSP features.
@@ -223,6 +226,23 @@ async function validateTextDocument(textDocument: TextDocument): Promise<void> {
 	connection.sendDiagnostics({ uri: textDocument.uri, diagnostics });
 }
 
+connection.onHover(
+	(_hoverParams) => {
+		if (doc == undefined || ast == undefined) return null;
+
+		const index = doc.offsetAt(_hoverParams.position);
+		const analyser = new StaticAnalysis()
+		analyser.traverse(ast, new Scope(ast.start, doc.getText().length))
+
+		const hoverables = analyser.hoverables.filter(h => index >= h.start && index <= h.end);
+		if (hoverables.length == 0) return null;
+
+		return {
+			contents: hoverables[0].message
+		};
+	}
+);
+
 // This handler provides the initial list of the completion items.
 connection.onCompletion(
 	(_textDocumentPosition: TextDocumentPositionParams): CompletionItem[] => {
@@ -246,10 +266,12 @@ connection.onCompletion(
 
 				// Structs
 				typeDefinitions.forEach(type => {
-					completions.push({
-						label: type.id,
-						kind: CompletionItemKind.Struct
-					})
+					if (type.type === "Struct") {
+						completions.push({
+							label: type.id,
+							kind: CompletionItemKind.Struct
+						})
+					}
 				})
 			}
 
@@ -290,24 +312,22 @@ const getCompletionsFromScope = (scope: Scope): CompletionItem[] => {
 const getCompletionsFromMember = (analyser: StaticAnalysis): CompletionItem[] => {
 	var completions: CompletionItem[] = [];
 
-	analyser.memberProperties.forEach(prop => {
-		completions.push({
-			label: prop.id,
-			kind: CompletionItemKind.Property
+	analyser.members.forEach(m => {
+		if (m.type === "Method") completions.push({
+			kind: CompletionItemKind.Method,
+			documentation: m.details,
+			label: m.id
 		})
-	})
 
-	analyser.memberMethods.forEach(prop => {
-		completions.push({
-			label: prop.id,
-			kind: CompletionItemKind.Method
+		else if (m.type === "StaticMethod") completions.push({
+			kind: CompletionItemKind.Function,
+			documentation: m.details,
+			label: m.id
 		})
-	})
 
-	analyser.memberStaticMethods.forEach(prop => {
-		completions.push({
-			label: prop.id,
-			kind: CompletionItemKind.Method
+		else if (m.type === "Property") completions.push({
+			kind: CompletionItemKind.Property,
+			label: m.id
 		})
 	})
 

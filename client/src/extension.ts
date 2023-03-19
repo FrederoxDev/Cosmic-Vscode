@@ -4,13 +4,13 @@
  * ------------------------------------------------------------------------------------------ */
 
 import * as path from 'path';
-import { workspace, ExtensionContext } from 'vscode';
+import { workspace, ExtensionContext, languages, Hover } from 'vscode';
 
 import {
 	LanguageClient,
 	LanguageClientOptions,
 	ServerOptions,
-	TransportKind
+	TransportKind,
 } from 'vscode-languageclient/node';
 
 let client: LanguageClient;
@@ -20,6 +20,22 @@ export function activate(context: ExtensionContext) {
 	const serverModule = context.asAbsolutePath(
 		path.join('server', 'out', 'server.js')
 	);
+
+	let disposable = languages.registerHoverProvider({ scheme: 'file', language: 'cosmic' }, {
+		async provideHover(document, position, token) {
+			const response = await client.sendRequest('textDocument/hover', {
+				textDocument: {
+					uri: document.uri.toString()
+				},
+				position: position
+			});
+
+			// @ts-ignore
+			return new Hover(response.contents);
+		}
+	});
+
+	context.subscriptions.push(disposable)
 
 	// If the extension is launched in debug mode then the debug server options are used
 	// Otherwise the run options are used
