@@ -148,6 +148,8 @@ var tokens = []
 var ast: StatementCommon | undefined = undefined;
 var didChangeLast = false;
 
+let analyser = new StaticAnalysis();
+
 async function validateTextDocument(textDocument: TextDocument): Promise<void> {
 	// In this simple example we get the settings for every validate run.
 	const settings = await getDocumentSettings(textDocument.uri);
@@ -220,6 +222,21 @@ async function validateTextDocument(textDocument: TextDocument): Promise<void> {
 		tokens = tokensRes;
 		ast = astRes;
 		didChangeLast = true;
+
+		// Type analyser
+		analyser = new StaticAnalysis()
+		analyser.traverse(astRes, new Scope(astRes.start, doc.getText().length))
+
+		analyser.errors.forEach(e => {
+			diagnostics.push({
+				message: e.message,
+				range: {
+					start: textDocument.positionAt(e.start),
+					end: textDocument.positionAt(e.end)
+				},
+				severity: e.severity
+			})
+		})
 	}
 	catch { }
 
@@ -231,9 +248,6 @@ connection.onHover(
 		if (doc == undefined || ast == undefined) return null;
 
 		const index = doc.offsetAt(_hoverParams.position);
-		const analyser = new StaticAnalysis()
-		analyser.traverse(ast, new Scope(ast.start, doc.getText().length))
-
 		const hoverables = analyser.hoverables.filter(h => index >= h.start && index <= h.end);
 		if (hoverables.length == 0) return null;
 
